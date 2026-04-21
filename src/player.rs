@@ -1,10 +1,14 @@
 use crate::map::Map;
+use crate::{PLAYER_MS, PLAYER_RS};
 
 pub struct Player{
-    pub pos: (f64,f64),
+    pub pos_x: f64,
+    pub pos_y: f64,
     pub vel: (f64,f64),
-    pub dir: (f64,f64),
-    pub plane: (f64,f64),
+    pub dir_x: f64,
+    pub dir_y: f64,
+    pub plane_x: f64,
+    pub plane_y: f64,
     pub vision_angle_rad: f64,
     pub max_speed: f64,
     pub max_rot_speed: f64,
@@ -14,10 +18,13 @@ pub struct Player{
 impl Player{
     pub fn new() -> Self{
         Player{
-            pos: (4.0,5.0),
+            pos_x: 4.0,
+            pos_y: 5.0,
             vel: (0.0,0.0),
-            dir: (0.0,0.0),
-            plane: (0.0,0.0),
+            dir_x: 0.0,
+            dir_y: -1.0,
+            plane_x: 0.66,
+            plane_y: 0.,
             vision_angle_rad: 0.0,
             max_speed: 1.0,
             max_rot_speed: 0.05,
@@ -25,43 +32,48 @@ impl Player{
         }
 
    }
-   pub fn check_move_ok(&self, map: &Map, direction: u8)->bool{
-      let pos_x = self.pos.0 as f32;
-      let pos_y = self.pos.1 as f32;
-
-          match direction{
-              0 => { //up (decrease y)
-                  if pos_y - 0.2 > 0.0 && map.grid[self.pos.1 as usize - 1][self.pos.0 as usize]
-                      == 0{return true;} else{return false;}
-              }
-              1 => { //down (increase y)
-                  if pos_y + 0.2 < 10.0 && map.grid[self.pos.1 as usize + 1][self.pos.0 as usize]
-                      == 0{return true;} else{return false;}
-              }
-              2 => { //left (decrease x)
-                  if pos_x - 0.2 > 0.0 && map.grid[self.pos.1 as usize][self.pos.0 as usize - 1]
-                      == 0{return true;} else{return false;}
-              }
-              3 => { //right (increase x)
-                  if pos_x - 0.2 < 10.0 && map.grid[self.pos.1 as usize][self.pos.0 as usize + 1]
-                      == 0{return true;} else{return false;}
-              }
-              _ => false,
-      }
-   }
-    pub fn move_player(&mut self, map: &Map, forward: bool, backward: bool, left: bool, right: bool){
+    pub fn move_player(&mut self, map: &Map, forward: bool, backward: bool, left: bool, right: bool, left_rot: bool, right_rot: bool, frame_time: f64){
+        let move_speed = frame_time * PLAYER_MS;
+        let rot_speed = frame_time * PLAYER_RS;
+        
         if forward{
-            if self.check_move_ok(&map, 0){self.pos.1 -= 0.1;}
-            println!("Player position:\t[{},{}]", self.pos.0, self.pos.1);
-        }else if backward{
-            if self.check_move_ok( &map, 1){self.pos.1 += 0.1;}
-            println!("Player position:\t[{},{}]", self.pos.0, self.pos.1);
-        }else if left{
-            if self.check_move_ok( &map, 2){self.pos.0 -= 0.1;}
-            println!("Player position:\t[{},{}]", self.pos.0, self.pos.1);
-        }else if right{
-            if self.check_move_ok( &map, 3){self.pos.0 += 0.1;}
-            println!("Player position:\t[{},{}]", self.pos.0, self.pos.1);
+            if map.grid[self.pos_y as usize][(self.pos_x + self.dir_x * move_speed) as usize] == 0 {self.pos_x += self.dir_x * move_speed}
+            if map.grid[(self.pos_y + self.dir_y * move_speed) as usize][self.pos_x as usize] == 0 {self.pos_y += self.dir_y * move_speed}
         }
+        
+        if backward{
+            if map.grid[self.pos_y as usize][(self.pos_x - self.dir_x * move_speed) as usize] == 0 {self.pos_x -= self.dir_x * move_speed}
+            if map.grid[(self.pos_y - self.dir_y * move_speed) as usize][self.pos_x as usize] == 0 {self.pos_y -= self.dir_y * move_speed}
+        }
+        
+        if left{
+            if map.grid[self.pos_y as usize][(self.pos_x + self.dir_y * move_speed) as usize] == 0 {self.pos_x += self.dir_y * move_speed}
+            if map.grid[(self.pos_y + self.dir_x * move_speed) as usize][self.pos_x as usize] == 0 {self.pos_y += self.dir_x * move_speed}
+        }
+        
+        if right{
+            if map.grid[self.pos_y as usize][(self.pos_x - self.dir_y * move_speed) as usize] == 0 {self.pos_x -= self.dir_y * move_speed}
+            if map.grid[(self.pos_y - self.dir_x * move_speed) as usize][self.pos_x as usize] == 0 {self.pos_y -= self.dir_x * move_speed}
+        }
+        
+        if  left_rot{
+            let old_dir_x = self.dir_x;
+            self.dir_x = self.dir_x * (-rot_speed).cos() - self.dir_y * (-rot_speed).sin();
+            self.dir_y = old_dir_x * (-rot_speed).sin() + self.dir_y * (-rot_speed).cos();
+            let old_plane_x = self.plane_x;
+            self.plane_x = self.plane_x * (-rot_speed).cos() - self.plane_y * (-rot_speed).sin();
+            self.plane_y = old_plane_x * (-rot_speed).sin() + self.plane_y * (-rot_speed).cos();
+        }
+        
+        if  right_rot{
+            let old_dir_x = self.dir_x;
+            self.dir_x = self.dir_x * rot_speed.cos() - self.dir_y * rot_speed.sin();
+            self.dir_y = old_dir_x * rot_speed.sin() + self.dir_y * rot_speed.cos();
+            let old_plane_x = self.plane_x;
+            self.plane_x = self.plane_x * rot_speed.cos() - self.plane_y * rot_speed.sin();
+            self.plane_y = old_plane_x * rot_speed.sin() + self.plane_y * rot_speed.cos();
+        }
+        
+        //println!("Player position:\t[{},{}]", self.pos_x, self.pos_y);
     }
 }
